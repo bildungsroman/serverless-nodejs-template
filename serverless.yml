@@ -1,18 +1,14 @@
-# Name your service using format rws-[servicename]-service
 service: serverless-template
-
+frameworkVersion: '>=1.2.0 <2.0.0'
 provider:
-# The following should stay as is unless specific customisations are required
   name: aws
   runtime: nodejs8.10
-  region: eu-west-1
+  region: eu-west-2
   stage: develop
   stackTags:
     Name: ${self:service}
     service_name: ${self:service}
     environment: ${opt:stage, self:provider.stage}
-    resource_owner: #Use your Bitbucket Name here
-    business_unit: RD:Development
     managed_by: sls
 # you can add statements to the Lambda function's IAM Role here
 #  iamRoleStatements:
@@ -44,6 +40,13 @@ provider:
 #    - exclude-me-dir/**
 functions:
   exampleFunction:
+    handler: src/functions/exampleFunction.exampleFunction
+    description:
+      Fn::Sub:
+        - 'Stack #{StackTagName} Environment #{EnvironmentTagName} Function #{ResourceName}'
+        - ResourceName: exampleFunction
+    runtime: nodejs8.10
+    tracing: Active
     tags:
       Name: ${self:service}-function-exampleFunction
       infrastructure_tier: Lambda
@@ -51,9 +54,12 @@ functions:
     iamRoleStatements:
       - Effect: Allow
         Action:
-          - resource:action
+          - xray:PutTraceSegments
+          - xray:PutTelemetryRecords
+          - xray:GetSamplingRules
+          - xray:GetSamplingTargets
+          - xray:GetSamplingStatisticSummaries
         Resource: '*'
-    handler: src/functions/exampleFunction.exampleFunction
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
 #    Check the event documentation for details
@@ -91,6 +97,7 @@ plugins:
   - serverless-iam-roles-per-function
   - serverless-pseudo-parameters
   - serverless-mocha-plugin
+  - serverless-cf-vars
 custom:
   serverless-mocha-plugin:
     testTemplate: templates/testTemplate.ejs
@@ -103,14 +110,13 @@ custom:
     managed_by: sls
     stackName: ${self:service}
     infrastructure_tier: APIGateway
-# you can add CloudFormation resource templates here
-#resources:
-#  Resources:
-#    NewResource:
-#      Type: AWS::S3::Bucket
-#      Properties:
-#        BucketName: my-new-bucket
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
+resources:
+  Parameters:
+    StackTagName:
+      Type: String
+      Description: Stack Name (injected by Stackery at deployment time)
+      Default: serverless-template
+    EnvironmentTagName:
+      Type: String
+      Description: Environment Name (injected by Stackery at deployment time)
+      Default: dev
